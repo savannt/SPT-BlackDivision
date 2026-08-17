@@ -1,5 +1,5 @@
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Models.Utils;
 
 namespace BlackDivServer;
 

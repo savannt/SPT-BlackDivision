@@ -1,9 +1,8 @@
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.Models.Eft.Common;
 using SPTarkov.Server.Core.Models.Spt.Config;
-using SPTarkov.Server.Core.Services;
+using SPTarkov.Server.Core.Models.Spt.Tables;
 using SPTarkov.Server.Core.Utils;
-using SPTarkov.Server.Core.Utils.Json;
 
 namespace BlackDivServer.Controllers;
 
@@ -12,7 +11,7 @@ public class SpawnController(
     JsonUtil jsonUtil,
     RandomUtil randomUtil,
     ConfigController configController,
-    DatabaseService databaseService,
+    LocationTable locationTable,
     RUAFLogger logger,
     HttpResponseUtil httpResponse
 )
@@ -28,15 +27,13 @@ public class SpawnController(
         {
             //return;
 
-            var tables = databaseService.GetTables();
-            var locations = databaseService.GetLocations();
             var mainConfig = configController.ModConfig;
 
-            var labs = locations.Laboratory;
+            var labs = locationTable.Laboratory;
             labs.Base.BossLocationSpawn.RemoveAll(x => x.BossName != null && (x.BossName.Contains("blackDiv") || x.BossName.Contains("bossWedge")));
-            
+
             var gate = labs.Base.BossLocationSpawn.Find(x => x?.TriggerId?.ToString() == "autoId_00014_EXFIL");
-            
+
             if (gate != null)
             {
                 gate1 = gate;
@@ -79,28 +76,6 @@ public class SpawnController(
                 //TriggerName = "byQuest"
             };
             labs.Base.BossLocationSpawn.Add(normalSpawn);
-            
-            /*var testSpawn = new BossLocationSpawn
-            {
-                BossName = "bossKilla",
-                BossChance = 100,
-                BossDifficulty = "normal",
-                BossEscortAmount = "1",
-                BossEscortDifficulty = "normal",
-                BossEscortType = "bossTagilla",
-                IsBossPlayer = false,
-                BossZone = "BotZoneFloor2,BotZoneFloor1,BotZoneBasement",
-                Delay = 0,
-                ForceSpawn = false,
-                IgnoreMaxBots = false,
-                IsRandomTimeSpawn = false,
-                SpawnMode = ["regular", "pve"],
-                Supports = null,
-                Time = -1,
-                TriggerId = "5936d90786f7742b1420ba5b",
-                TriggerName = "byQuest"
-            };
-            labs.Base.BossLocationSpawn.Add(testSpawn);*/
 
             if (randomUtil.GetChance100(mainConfig.spawns.labsGateChances))
             {
@@ -162,18 +137,18 @@ public class SpawnController(
             {
                 logger.Info($"Adjusting Black Division spawns for {map}.");
 
-                if (!locations.GetDictionary().ContainsKey(locations.GetMappedKey(map)))
+                if (!locationTable.GetDictionary().ContainsKey(locationTable.GetMappedKey(map)))
                 {
                     logger.Info($"No location data found for {map}. Skipping Black Division spawn adjustment.");
                     continue;
                 }
-                
-                var spawns = locations.GetDictionary()[locations.GetMappedKey(map)].Base.BossLocationSpawn;
+
+                var spawns = locationTable.GetDictionary()[locationTable.GetMappedKey(map)].Base.BossLocationSpawn;
 
                 // Remove existing spawns
                 spawns.RemoveAll(x => x.BossName.Contains("blackDiv"));
-                
-                AdjustHuntSpawnsForMap(map, spawns, locations.GetDictionary()[locations.GetMappedKey(map)]);
+
+                AdjustHuntSpawnsForMap(map, spawns, locationTable.GetDictionary()[locationTable.GetMappedKey(map)]);
             }
         }
         catch (Exception ex)
@@ -228,7 +203,7 @@ public class SpawnController(
         var timeLimit = (location.Base.EscapeTimeLimit ?? 45) * 60;
         var timeFactor = Double.Lerp(configController.ModConfig.spawns.minTime,
             configController.ModConfig.spawns.maxTime, factor);
-        
+
         patrol.Time = double.Round(timeFactor * timeLimit);
         patrol.BossChance = configController.ModConfig.spawns.chance;
 
@@ -246,7 +221,7 @@ public class SpawnController(
     {
         var bossType = "blackDivAssault";
         var followers = patrolSize - 1;
-        
+
         var bossInfo = new BossLocationSpawn
         {
             BossChance = chance,

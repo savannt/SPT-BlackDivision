@@ -1,5 +1,5 @@
 using SPTarkov.DI.Annotations;
-using SPTarkov.Server.Core.Helpers;
+using SPTarkov.Server.Core.Helpers.Server;
 using System.Reflection;
 
 namespace BlackDivServer;
@@ -8,11 +8,11 @@ namespace BlackDivServer;
 public class ConfigController
 {
     public MainConfig ModConfig;
-    
+
     private FileSystemWatcher watcher;
 
     public readonly ModHelper _modHelper;
-    
+
     public RUAFLogger logger;
 
     public ConfigController(ModHelper modHelper)
@@ -22,12 +22,12 @@ public class ConfigController
         var pathToMod = _modHelper.GetAbsolutePathToModFolder(Assembly.GetExecutingAssembly());
 
         ModConfig = _modHelper.GetJsonDataFromFile<MainConfig>(pathToMod, "config.jsonc");
-        
+
         watcher = new FileSystemWatcher(pathToMod,  "config.jsonc");
         watcher.NotifyFilter = NotifyFilters.LastWrite;
 
         watcher.Changed += OnChanged;
-        
+
         watcher.EnableRaisingEvents = true;
     }
 
@@ -58,7 +58,7 @@ public class ConfigController
                 }
             }
         );
-        
+
         logger?.Info("Config reloaded.", true);
     }
 }
