@@ -1,6 +1,7 @@
 using MoreBotsServer.Models;
 using BlackDivServer.Controllers;
 using SPTarkov.Common.Extensions;
+using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Helpers.Server;
@@ -58,6 +59,7 @@ public class ModPreload : IOnLoad
 
 [Injectable(InjectionType = InjectionType.Singleton, TypePriority = MoreBotsServer.MoreBotsLoadOrder.LoadBots)]
 public class BlackDivServer(
+    ISptLogger<BlackDivServer> logger,
     MoreBotsServer.MoreBotsAPI moreBotsLib,
     MoreBotsServer.Services.MoreBotsCustomBotTypeService customBotTypeService,
     MoreBotsServer.Services.FactionService factionService,
@@ -105,11 +107,19 @@ public class BlackDivServer(
 
         if (modList.Any(mod => mod.ModMetadata.ModGuid == "com.manimal.csgas"))
         {
-            botTable.Types["bosswedge"]?.BotInventory.Items.Pockets.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
-            botTable.Types["bosswedge"]?.BotInventory.Items.SecuredContainer.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
+            // Dictionary indexers throw KeyNotFoundException on a missing key; the ?. below
+            // only ever guarded against a null value, never against the key being absent.
+            foreach (var csGasType in new[] { "bosswedge", "blackdivib" })
+            {
+                if (!botTable.Types.TryGetValue(csGasType, out var csGasBot) || csGasBot is null)
+                {
+                    logger.Warning($"[BlackDiv Mod] Skipping CS gas for '{csGasType}': bot type not registered.");
+                    continue;
+                }
 
-            botTable.Types["blackdivib"]?.BotInventory.Items.Pockets.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
-            botTable.Types["blackdivib"]?.BotInventory.Items.SecuredContainer.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
+                csGasBot.BotInventory.Items.Pockets.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
+                csGasBot.BotInventory.Items.SecuredContainer.Add("6a5d6a5f4ed8c025a0a2cff0", 10000);
+            }
         }
 
         customBotTypeService.AddCustomWildSpawnTypeNames(typeDictionary);
@@ -139,6 +149,25 @@ public class BlackDivServer(
 
         // Use WTT to add locales
         await commonLib.CustomLocaleService.CreateCustomLocales(assembly);
+
+        // Every spawn we are about to register names one of these bot types. If a type did not
+        // register, the server survives startup and then throws
+        // "The given key '<type>' was not present in the dictionary" the moment a raid tries to
+        // spawn one. Fail loudly here instead, and leave the spawns alone so raids still load.
+        var missingTypes = typeList
+            .Where(type => !botTable.Types.ContainsKey(type.ToLowerInvariant()))
+            .ToList();
+
+        if (missingTypes.Count > 0)
+        {
+            logger.Error(
+                $"[BlackDiv Mod] Not registering spawns: bot type(s) {string.Join(", ", missingTypes)} " +
+                "failed to load. This almost always means the mod folder is incomplete - " +
+                "SPT_Runtime/user/mods/BlackDivServer should contain 19 files, including the whole db/ " +
+                "tree (db/bots/sharedTypes/blackDiv.json, db/CustomBotLoadouts/*.json). Delete the folder " +
+                "and re-extract the release zip into your SPT root rather than copying files by hand.");
+            return;
+        }
 
         // Add to spawns
         spawnController.AdjustAllSpawns();
