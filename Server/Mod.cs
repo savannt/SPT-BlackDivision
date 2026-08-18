@@ -18,7 +18,7 @@ public record ModMetadata : IModMetadata
     public string Name { get; init; } = "Black Division [REDACTED] Home";
     public string Author { get; init; } = "TacticalToaster";
     public List<string>? Contributors { get; init; } = new() { };
-    public SemanticVersioning.Version Version { get; init; } = new(1, 2, 1);
+    public SemanticVersioning.Version Version { get; init; } = new(1, 2, 3);
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.0");
     public bool HasPrepatcher { get; init; } = false;
     public List<string>? Incompatibilities { get; init; }
